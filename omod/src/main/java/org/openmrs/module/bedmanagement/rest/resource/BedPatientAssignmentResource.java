@@ -13,10 +13,9 @@
  */
 package org.openmrs.module.bedmanagement.rest.resource;
 
-import org.openmrs.api.LocationService;
 import org.openmrs.api.context.Context;
-import org.openmrs.module.bedmanagement.AdmissionLocation;
 import org.openmrs.module.bedmanagement.BedManagementService;
+import org.openmrs.module.bedmanagement.BedPatientAssignment;
 import org.openmrs.module.webservices.rest.web.RequestContext;
 import org.openmrs.module.webservices.rest.web.RestConstants;
 import org.openmrs.module.webservices.rest.web.annotation.Resource;
@@ -24,8 +23,6 @@ import org.openmrs.module.webservices.rest.web.representation.DefaultRepresentat
 import org.openmrs.module.webservices.rest.web.representation.FullRepresentation;
 import org.openmrs.module.webservices.rest.web.representation.RefRepresentation;
 import org.openmrs.module.webservices.rest.web.representation.Representation;
-import org.openmrs.module.webservices.rest.web.resource.api.PageableResult;
-import org.openmrs.module.webservices.rest.web.resource.impl.AlreadyPaged;
 import org.openmrs.module.webservices.rest.web.resource.impl.DelegatingCrudResource;
 import org.openmrs.module.webservices.rest.web.resource.impl.DelegatingResourceDescription;
 import org.openmrs.module.webservices.rest.web.response.ResourceDoesNotSupportOperationException;
@@ -34,15 +31,8 @@ import org.openmrs.module.webservices.rest.web.response.ResponseException;
 import java.util.Arrays;
 import java.util.List;
 
-@Resource(name = RestConstants.VERSION_1 + "/admissionLocation", supportedClass = AdmissionLocation.class, supportedOpenmrsVersions = {"1.9.*", "1.10.*", "1.11.*", "1.12.*"})
-public class AdmissionLocationResource extends DelegatingCrudResource<AdmissionLocation> {
-
-    @Override
-    protected PageableResult doGetAll(RequestContext context) throws ResponseException {
-        BedManagementService bedManagementService = (BedManagementService) Context.getModuleOpenmrsServices(BedManagementService.class.getName()).get(0);
-        List<AdmissionLocation> admissionLocations = bedManagementService.getAllAdmissionLocations();
-        return new AlreadyPaged<AdmissionLocation>(context, admissionLocations, false);
-    }
+@Resource(name = RestConstants.VERSION_1 + "/bedPatientAssignment", supportedClass = BedPatientAssignment.class, supportedOpenmrsVersions = {"1.9.*", "1.10.*", "1.11.*", "1.12.*"})
+public class BedPatientAssignmentResource extends DelegatingCrudResource<BedPatientAssignment> {
 
     @Override
     public List<Representation> getAvailableRepresentations() {
@@ -53,48 +43,51 @@ public class AdmissionLocationResource extends DelegatingCrudResource<AdmissionL
     public DelegatingResourceDescription getRepresentationDescription(Representation rep) {
         if ((rep instanceof DefaultRepresentation) || (rep instanceof RefRepresentation)) {
             DelegatingResourceDescription description = new DelegatingResourceDescription();
-            description.addProperty("ward");
-            description.addProperty("totalBeds");
-            description.addProperty("occupiedBeds");
+            description.addProperty("bed", Representation.DEFAULT);
+            description.addProperty("patient", Representation.REF);
+            description.addProperty("encounter", Representation.REF);
             return description;
         }
+
         if ((rep instanceof FullRepresentation)) {
             DelegatingResourceDescription description = new DelegatingResourceDescription();
-            description.addProperty("bedLayouts");
+            description.addProperty("bed", Representation.DEFAULT);
+            description.addProperty("patient", Representation.REF);
+            description.addProperty("encounter", Representation.FULL);
             return description;
         }
         return null;
+
     }
 
     @Override
-    public AdmissionLocation getByUniqueId(String uuid) {
+    public BedPatientAssignment getByUniqueId(String uuid) {
         BedManagementService bedManagementService = (BedManagementService) Context.getModuleOpenmrsServices(BedManagementService.class.getName()).get(0);
-        LocationService locationService = Context.getLocationService();
-        return bedManagementService.getLayoutForWard(locationService.getLocationByUuid(uuid));
+        return bedManagementService.getBedPatientAssignmentByUuid(uuid);
     }
 
     @Override
-    protected void delete(AdmissionLocation admissionLocation, String s, RequestContext requestContext) throws ResponseException {
-        throw new ResourceDoesNotSupportOperationException("delete of admission location not supported");
+    protected void delete(BedPatientAssignment bedPatientAssignment, String s, RequestContext requestContext) throws ResponseException {
+        throw new ResourceDoesNotSupportOperationException("delete of bed patient assignment not supported");
     }
 
     @Override
-    public void purge(AdmissionLocation admissionLocation, RequestContext requestContext) throws ResponseException {
-        throw new ResourceDoesNotSupportOperationException("purge of admission location not supported");
+    public void purge(BedPatientAssignment bedPatientAssignment, RequestContext requestContext) throws ResponseException {
+        throw new ResourceDoesNotSupportOperationException("purge of bed patient assignment not supported");
     }
 
     @Override
     public DelegatingResourceDescription getCreatableProperties() throws ResourceDoesNotSupportOperationException {
-        throw new ResourceDoesNotSupportOperationException("create of admission location not supported");
+        throw new ResourceDoesNotSupportOperationException("create of bed patient assignment not supported");
     }
 
     @Override
-    public AdmissionLocation newDelegate() {
-        return new AdmissionLocation();
+    public BedPatientAssignment newDelegate() {
+        return new BedPatientAssignment();
     }
 
     @Override
-    public AdmissionLocation save(AdmissionLocation admissionLocation) {
-        throw new ResourceDoesNotSupportOperationException("save of admission location not supported");
+    public BedPatientAssignment save(BedPatientAssignment bedPatientAssignment) {
+        throw new ResourceDoesNotSupportOperationException("save of bed patient assignment not supported");
     }
 }

@@ -12,7 +12,7 @@
 		${project.parent.description}
 	</description>
 	<updateURL>https://modules.openmrs.org/modules/download/${project.parent.artifactId}/update.rdf</updateURL>
-	<require_version>${openMRSVersion}</require_version>
+	<require_version>${openMRSRuntimeVersion}</require_version>
 	<!-- / Module Properties -->
 
 
@@ -20,18 +20,24 @@
     <!-- Required Modules -->
     <require_modules>
         <require_module version="${webservicesRestModuleVersion}">org.openmrs.module.webservices.rest</require_module>
+        <require_module version="${openmrsAtomfeedVersion}">org.ict4h.openmrs.openmrs-atomfeed</require_module>
     </require_modules>
     <!-- / Required Modules -->
 
     <!-- Module Activator -->
 	<activator>${project.parent.groupId}.${project.parent.artifactId}.BedManagementActivator</activator>
-	
+
+    <advice>
+        <point>org.openmrs.module.bedmanagement.BedManagementService</point>
+        <class>org.openmrs.module.bedmanagement.atomfeed.BedAssignmentAdvice</class>
+    </advice>
 	
 	<!-- Maps hibernate file's, if present -->
 	<mappingFiles>
         Bed.hbm.xml
         BedLocationMapping.hbm.xml
         BedPatientAssignment.hbm.xml
+        BedType.hbm.xml
 	</mappingFiles>
 
 	<!-- Internationalization -->

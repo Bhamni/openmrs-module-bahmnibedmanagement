@@ -13,18 +13,20 @@
  */
 package org.openmrs.module.bedmanagement;
 
-import org.hibernate.Query;
 import org.hibernate.SessionFactory;
 import org.hibernate.classic.Session;
 import org.hibernate.transform.Transformers;
+import org.openmrs.Encounter;
 import org.openmrs.Location;
 import org.openmrs.Patient;
-import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
 
 public class HibernateBedManagementDAO implements BedManagementDAO {
     SessionFactory sessionFactory;
@@ -34,7 +36,6 @@ public class HibernateBedManagementDAO implements BedManagementDAO {
     }
 
     @Override
-    @Transactional
     public List<AdmissionLocation> getAdmissionLocationsBy(String locationTagName) {
         Session session = sessionFactory.getCurrentSession();
 
@@ -65,14 +66,17 @@ public class HibernateBedManagementDAO implements BedManagementDAO {
     }
 
     @Override
-    @Transactional
     public AdmissionLocation getLayoutForWard(Location location) {
         Session session = sessionFactory.getCurrentSession();
         List<Location> physicalLocations = getPhysicalLocationsByLocationTagAndParentLocation(BedManagementApiConstants.LOCATION_TAG_SUPPORTS_ADMISSION, location, session);
 
-        String hql = "select blm.row as rowNumber, blm.column as columnNumber, bed.id as bedId, bed.bedNumber as bedNumber, bed.status as status from BedLocationMapping blm " +
-                "left outer join blm.bed  bed " +
-                "where blm.location in (:physicalLocations)";
+        String hql = "select blm.row as rowNumber, blm.column as columnNumber, " +
+                "bed.id as bedId, bed.bedNumber as bedNumber, " +
+                "bed.status as status, bedType as bedType, blm.location.name as location " +
+                "from BedLocationMapping blm " +
+                "left outer join blm.bed bed " +
+                "left outer join bed.bedType bedType " +
+                "where blm.location in (:physicalLocations) ";
 
         List<BedLayout> bedLayouts = sessionFactory.getCurrentSession().createQuery(hql)
                 .setParameterList("physicalLocations", physicalLocations)
@@ -92,13 +96,13 @@ public class HibernateBedManagementDAO implements BedManagementDAO {
     }
 
     @Override
-    @Transactional
-    public BedDetails assignPatientToBed(Patient patient, Bed bed) {
+    public BedDetails assignPatientToBed(Patient patient, Encounter encounter, Bed bed) {
 
         Session session = sessionFactory.getCurrentSession();
 
         BedPatientAssignment bedPatientAssignment = new BedPatientAssignment();
         bedPatientAssignment.setPatient(patient);
+        bedPatientAssignment.setEncounter(encounter);
         bedPatientAssignment.setBed(bed);
         bedPatientAssignment.setStartDatetime(Calendar.getInstance().getTime());
 
@@ -111,8 +115,9 @@ public class HibernateBedManagementDAO implements BedManagementDAO {
         session.saveOrUpdate(bed);
 
         BedDetails bedDetails = new BedDetails();
-        bedDetails.setBedId(bed.getId());
+        bedDetails.setBed(bed);
         bedDetails.setBedNumber(bed.getBedNumber());
+        bedDetails.addCurrentAssignment(bedPatientAssignment);
         return bedDetails;
     }
 
@@ -124,7 +129,11 @@ public class HibernateBedManagementDAO implements BedManagementDAO {
     }
 
     @Override
-    @Transactional
+    public Bed getBedByUuid(String uuid) {
+        return (Bed) sessionFactory.getCurrentSession().createQuery("from Bed b where b.uuid = :uuid").setString("uuid", uuid).uniqueResult();
+    }
+
+    @Override
     public Bed getBedByPatient(Patient patient) {
         Session session = sessionFactory.getCurrentSession();
         Bed bed = (Bed) session.createQuery("select bpa.bed.bedNumber as bedNumber,bpa.bed.id as id from BedPatientAssignment bpa " +
@@ -136,13 +145,81 @@ public class HibernateBedManagementDAO implements BedManagementDAO {
     }
 
     @Override
-    @Transactional
-    public Location getWardsForBed(Bed bed) {
+    public Location getWardForBed(Bed bed) {
         Session session = sessionFactory.getCurrentSession();
         BedLocationMapping bedLocationMapping = (BedLocationMapping) session.createQuery("select blm.location as location from BedLocationMapping blm where blm.bed = :bed")
                 .setParameter("bed", bed)
                 .setResultTransformer(Transformers.aliasToBean(BedLocationMapping.class))
                 .uniqueResult();
-        return bedLocationMapping.getLocation();
+        if (bedLocationMapping != null) {
+            return bedLocationMapping.getLocation();
+        }
+        return null;
+    }
+
+    @Override
+    public BedDetails unassignPatient(Patient patient, Bed bed) {
+        Session session = sessionFactory.getCurrentSession();
+        BedPatientAssignment currentBedPatientAssignment = (BedPatientAssignment) session.createQuery("from BedPatientAssignment where bed=:bed and patient=:patient and endDatetime is null")
+                .setParameter("bed", bed)
+                .setParameter("patient", patient)
+                .uniqueResult();
+        currentBedPatientAssignment.setEndDatetime(new Date());
+        session.saveOrUpdate(currentBedPatientAssignment);
+
+        Bed bedFromSession = (Bed) session.get(Bed.class, bed.getId());
+        List<BedPatientAssignment> activeBedPatientAssignment = filterActiveBedPatientAssignments(bedFromSession);
+        if(activeBedPatientAssignment.size() == 0) {
+            bedFromSession.setStatus(BedStatus.AVAILABLE.toString());
+        }
+        session.saveOrUpdate(bedFromSession);
+
+        session.flush();
+
+        BedDetails bedDetails = new BedDetails();
+        bedDetails.setBed(bedFromSession);
+        bedDetails.setBedNumber(bedFromSession.getBedNumber());
+        bedDetails.setLastAssignment(currentBedPatientAssignment);
+        return bedDetails;
+    }
+
+    private List<BedPatientAssignment> filterActiveBedPatientAssignments(Bed bedFromSession) {
+        List<BedPatientAssignment> activeBedPatientAssignment = new ArrayList<BedPatientAssignment>();
+        for(BedPatientAssignment bedPatientAssignment: bedFromSession.getBedPatientAssignment()){
+            if(bedPatientAssignment.getEndDatetime() == null){
+                activeBedPatientAssignment.add(bedPatientAssignment);
+            }
+        }
+        return activeBedPatientAssignment;
+    }
+
+    @Override
+    public BedPatientAssignment getBedPatientAssignmentByUuid(String uuid) {
+        Session session = sessionFactory.getCurrentSession();
+        return  (BedPatientAssignment) session.createQuery("from BedPatientAssignment bpa " +
+                "where bpa.uuid = :uuid")
+                .setParameter("uuid", uuid)
+                .uniqueResult();
+    }
+
+    @Override
+    public List<BedPatientAssignment> getCurrentAssignmentsByBed(Bed bed) {
+        Session session = sessionFactory.getCurrentSession();
+        List<BedPatientAssignment> assignments = session.createQuery("from BedPatientAssignment where bed=:bed and endDatetime is null")
+                .setParameter("bed", bed)
+                .list();
+        return assignments;
+    }
+
+    @Override
+    public Bed getLatestBedByVisit(String visitUuid) {
+        Session session = sessionFactory.getCurrentSession();
+        Bed bed = (Bed) session.createQuery("select bpa.bed from BedPatientAssignment bpa " +
+                "inner join bpa.encounter enc " +
+                "inner join enc.visit v where v.uuid = :visitUuid order by bpa.startDatetime DESC")
+                .setParameter("visitUuid", visitUuid)
+                .setMaxResults(1)
+                .uniqueResult();
+        return bed;
     }
 }

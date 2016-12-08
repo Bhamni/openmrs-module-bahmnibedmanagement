@@ -1,12 +1,15 @@
 package org.openmrs.module.bedmanagement;
 
+import org.codehaus.jackson.annotate.JsonIgnoreProperties;
+@JsonIgnoreProperties({"patient"})
 public class BedLayout {
     private Integer rowNumber;
     private Integer columnNumber;
-//    private Bed bedDetails;
     private String bedNumber;
     private Integer bedId;
     private String status;
+    private BedType bedType;
+    private String location;
 
     public String getBedNumber() {
         return bedNumber;
@@ -32,16 +35,6 @@ public class BedLayout {
         this.status = status;
     }
 
-
-//
-//    public Bed getBedDetails() {
-//        return bedDetails;
-//    }
-//
-//    public void setBedDetails(Bed bedDetails) {
-//        this.bedDetails = bedDetails;
-//    }
-
     public Integer getRowNumber() {
         return rowNumber;
     }
@@ -58,6 +51,22 @@ public class BedLayout {
         this.columnNumber = columnNumber;
     }
 
+    public BedType getBedType() {
+        return bedType;
+    }
+
+    public void setBedType(BedType bedType) {
+        this.bedType = bedType;
+    }
+
+    public String getLocation() {
+        return location;
+    }
+
+    public void setLocation(String location) {
+        this.location = location;
+    }
+
     @Override
     public String toString() {
         return "BedLayout{" +
@@ -66,6 +75,8 @@ public class BedLayout {
                 ", bedNumber='" + bedNumber + '\'' +
                 ", bedId=" + bedId +
                 ", status='" + status + '\'' +
+                ", bedType=" + bedType +
+                ", location='" + location + '\'' +
                 '}';
     }
 }

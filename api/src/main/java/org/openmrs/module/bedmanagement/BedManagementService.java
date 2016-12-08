@@ -14,20 +14,44 @@
 package org.openmrs.module.bedmanagement;
 
 
+import org.openmrs.Encounter;
 import org.openmrs.Location;
 import org.openmrs.Patient;
+import org.openmrs.annotation.Authorized;
 import org.openmrs.api.OpenmrsService;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+@Transactional
 public interface BedManagementService extends OpenmrsService {
+
+    @Authorized({"Get Admission Locations"})
     List<AdmissionLocation> getAllAdmissionLocations();
 
+    @Authorized({"Get Admission Locations"})
     AdmissionLocation getLayoutForWard(Location location);
 
-    BedDetails assignPatientToBed(Patient patient, Bed bed);
+    @Authorized(value = {"Assign Beds", "Edit Admission Locations"}, requireAll=true)
+    BedDetails assignPatientToBed(Patient patient, Encounter encounter, String bedId);
 
     Bed getBedById(int id);
 
-    BedDetails getBedAssignmentDetailsByPatients(Patient patient);
+    @Authorized(value = {"Get Beds", "Get Admission Locations"}, requireAll=true)
+    BedDetails getBedAssignmentDetailsByPatient(Patient patient);
+
+    @Authorized(value = {"Get Admission Locations","Get Beds"}, requireAll=true)
+    BedDetails getBedDetailsById(String id);
+
+    @Authorized(value = {"Get Admission Locations","Get Beds"}, requireAll=true)
+    BedDetails getBedDetailsByUuid(String uuid);
+
+    @Authorized(value = {"Get Admission Locations","Get Beds"}, requireAll=true)
+    BedPatientAssignment getBedPatientAssignmentByUuid(String uuid);
+
+    @Authorized(value = {"Assign Beds", "Edit Admission Locations"}, requireAll=true)
+    BedDetails unAssignPatientFromBed(Patient patient);
+
+    @Authorized(value = {"Get Beds", "Get Admission Locations"}, requireAll=true)
+    BedDetails getLatestBedDetailsByVisit(String visitUuid);
 }
